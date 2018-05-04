@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<ruleset name="Custom Standard">
+
+    <!-- See : https://github.com/squizlabs/PHP_CodeSniffer/wiki/Customisable-Sniff-Properties -->
+
+    <!-- Args -->
+    <arg name="colors" />
+
+    <!-- Dev -->
+    <file>public/index.php</file>
+    <file>src</file>
+
+    <!-- Global rule -->
+    <rule ref="PSR2" />
+
+    <!--Specifics rules -->
+
+    <!-- Files -->
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="160" />
+            <property name="absoluteLineLimit" value="160" />
+        </properties>
+    </rule>
+    <rule ref="Generic.Files.LineEndings">
+        <properties>
+            <property name="eolChar" value="\n" />
+        </properties>
+    </rule>
+
+    <!-- String -->
+    <rule ref="Squiz.Strings.DoubleQuoteUsage" />
+    <rule ref="Squiz.Strings.ConcatenationSpacing">
+        <properties>
+            <property name="spacing" value="1" />
+            <property name="ignoreNewlines" value="true" />
+        </properties>
+    </rule>
+
+    <!-- Array -->
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax" />
+</ruleset>
