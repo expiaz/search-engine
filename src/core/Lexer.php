@@ -63,7 +63,7 @@ class Lexer
      * @param float $type
      * @return Word[]
      */
-    public function lex($sentence, $type = Word::BODY): array
+    public function lemmatise($sentence, $type = Word::BODY): array
     {
         $lemmes = [];
         $words = preg_split(

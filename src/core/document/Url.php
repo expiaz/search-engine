@@ -46,7 +46,7 @@ class Url
         }
         if ($this->query) {
             $this->url .= "?{$this->query}";
-            $this->uri .= "/{$this->path}";
+            $this->uri .= "/{$this->query}";
         }
         if ($this->fragment) {
             $this->url .= "#{$this->fragment}";
@@ -114,10 +114,23 @@ class Url
         return $this->uri;
     }
 
+    public function equals(Url $url)
+    {
+        return $this->host === $url->getHost() &&
+            $this->path === $url->getPath() &&
+            (
+                $this->query === $url->getQuery() ||
+                false !== strpos($url->getQuery(), $this->query)
+            );
+    }
+
     /**
+     * @param int $maxRedundance
+     * @param array $siteLinks
+     * @param Document[] $pageLinks
      * @return bool does the crawler should explore this ressource
      */
-    public function shouldFollow(): bool
+    public function shouldFollow(int $maxRedundance, array $siteLinks = [], array $pageLinks = []): bool
     {
         // a page is identified by it's domain, path and query
         // the fragment does not identify a different page
@@ -131,12 +144,7 @@ class Url
             // same page as the page where link is
             // or query contains the actual page and will
             // gives redundant informations
-            if (
-                $this->host === $this->context->getHost() &&
-                $this->path === $this->context->getPath() &&
-                $this->query === $this->context->getQuery() ||
-                false !== strpos($this->context->getQuery(), $this->query)
-            ) {
+            if ($this->equals($this->context)) {
                 return false;
             }
         }
@@ -152,6 +160,22 @@ class Url
             $this->host
         )) {
             return false;
+        }
+
+        $redundance = 0;
+        foreach ($siteLinks as $traversed) {
+            if ($this->equals($traversed)) {
+                if (++$redundance >= $maxRedundance) {
+                    return false;
+                }
+            }
+        }
+
+        foreach ($pageLinks as $traversed) {
+            // the url is redundant in the document
+            if ($this->equals($traversed->getUrl())) {
+                return false;
+            }
         }
 
         // try to fetch the page
@@ -218,6 +242,11 @@ class Url
             'fragment' => $this->fragment,
             'port' => $this->port
         ];
+    }
+
+    public function __toString(): string
+    {
+        return $this->url;
     }
 
 }

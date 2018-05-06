@@ -4,10 +4,24 @@ namespace SearchEngine\Core\Document;
 
 class Document
 {
+    /**
+     * @var Url
+     */
     private $url;
+    /**
+     * @var Word[]
+     */
     private $words;
+    /**
+     * @var Document[]
+     */
     public $referenceTo;
+    /**
+     * @var Document[]
+     */
     public $referencedBy;
+
+    private $pageRank;
 
     public function __construct(Url $url)
     {
@@ -15,6 +29,7 @@ class Document
         $this->words = [];
         $this->referenceTo = [];
         $this->referencedBy = [];
+        $this->pageRank = 0;
     }
 
     public function getUrl(): Url
@@ -41,5 +56,25 @@ class Document
         return $this->words;
     }
 
+    /**
+     * @param float $pageRank
+     */
+    public function setPageRank(float $pageRank)
+    {
+        $this->pageRank = $pageRank;
+    }
+
+    /**
+     * @return float
+     */
+    public function getPageRank(): float
+    {
+        return $this->pageRank;
+    }
+
+    public function __toString()
+    {
+        return "URI:{$this->url->getUri()} PR:{$this->pageRank}";
+    }
 
 }

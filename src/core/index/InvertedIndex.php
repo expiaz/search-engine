@@ -16,6 +16,7 @@ class InvertedIndex
 
     public function addEntry(Word $word, Document $document)
     {
+        echo "{$word->getCanonical()} {$word->getValue()} : {$word->getStrength()}\n";
         if (!array_key_exists($word->getCanonical(), $this->words)) {
             $this->words[$word->getCanonical()] = [];
         }

@@ -11,7 +11,7 @@ class LexerTest extends TestCase
     public function testLex()
     {
         $lexer = new Lexer();
-        $words = $lexer->lex('Je jouait au ballon avec tommy hier');
+        $words = $lexer->lemmatise('Je jouait au ballon avec tommy hier');
         var_dump($words);
     }
 
