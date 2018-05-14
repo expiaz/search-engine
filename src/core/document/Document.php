@@ -2,6 +2,8 @@
 
 namespace SearchEngine\Core\Document;
 
+use SearchEngine\Core\Index\Entry;
+
 class Document
 {
     /**
@@ -21,7 +23,16 @@ class Document
      */
     public $referencedBy;
 
+    private $title;
+
     private $pageRank;
+
+
+    public $eucludianLength;
+    /**
+     * @var int used at each query
+     */
+    public $revelance;
 
     public function __construct(Url $url)
     {
@@ -30,6 +41,11 @@ class Document
         $this->referenceTo = [];
         $this->referencedBy = [];
         $this->pageRank = 0;
+        $this->title = $url->getUri();
+
+        $this->eucludianLength = 0;
+
+        $this->revelance = 0;
     }
 
     public function getUrl(): Url
@@ -43,17 +59,43 @@ class Document
         $this->referenceTo[] = $document;
     }
 
-    public function addWord(Word $word)
+    public function addWord(string $canonical, Entry $entry)
     {
-        $this->words[] = $word;
+        $this->words[$canonical] = $entry;
+    }
+
+    public function haveWord(string $canonical): bool
+    {
+        return array_key_exists($canonical, $this->words);
+    }
+
+    public function getWord(string $canonical): ?Entry
+    {
+        return $this->words[$canonical];
     }
 
     /**
-     * @return Word[]
+     * @return Entry[]
      */
     public function getWords(): array
     {
         return $this->words;
+    }
+
+    /**
+     * @param string $title
+     */
+    public function setTitle(string $title)
+    {
+        $this->title = $title;
+    }
+
+    /**
+     * @return string
+     */
+    public function getTitle(): string
+    {
+        return $this->title;
     }
 
     /**
@@ -74,7 +116,7 @@ class Document
 
     public function __toString()
     {
-        return "URI:{$this->url->getUri()} PR:{$this->pageRank}";
+        return "URI:{$this->url->getUri()} PR:{$this->pageRank} SIM:{$this->revelance}";
     }
 
 }

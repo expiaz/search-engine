@@ -3,6 +3,7 @@
 namespace SearchEngine\Core;
 
 use SearchEngine\Core\Document\Word;
+use SearchEngine\Core\Index\Entry;
 use Wamania\Snowball\French;
 
 class Lexer
@@ -61,7 +62,7 @@ class Lexer
     /**
      * @param $sentence
      * @param float $type
-     * @return Word[]
+     * @return Entry[]
      */
     public function lemmatise($sentence, $type = Word::BODY): array
     {
@@ -74,11 +75,12 @@ class Lexer
         );
         foreach ($words as $word) {
             $canonical = $this->canonize($word);
-            if (
-                null !== $canonical && strlen($canonical)
-                && !in_array($canonical, $lemmes)
-            ) {
-                $lemmes[] = new Word($word, $canonical, $type);
+            if (null !== $canonical && strlen($canonical)) {
+                if (! array_key_exists($canonical, $lemmes)) {
+                    $lemmes[$canonical] = new Entry($type, 1);
+                } else {
+                    $lemmes[$canonical]->occurence(1, $type);
+                }
             }
         }
 

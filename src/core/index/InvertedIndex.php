@@ -3,37 +3,56 @@
 namespace SearchEngine\Core\Index;
 
 use SearchEngine\Core\Document\Document;
-use SearchEngine\Core\Document\Word;
+use SplObjectStorage;
 
 class InvertedIndex
 {
     private $words;
+    private $size;
+    private $length;
 
     public function __construct()
     {
         $this->words = [];
+        $this->size = 0;
+        $this->length = 0;
     }
 
-    public function addEntry(Word $word, Document $document)
+    public function add(Document $document, string $canonical, Entry $entry)
     {
-        echo "{$word->getCanonical()} {$word->getValue()} : {$word->getStrength()}\n";
-        if (!array_key_exists($word->getCanonical(), $this->words)) {
-            $this->words[$word->getCanonical()] = [];
+        if (! $this->has($canonical)) {
+            ++$this->size;
+            $this->words[$canonical] = new SplObjectStorage();
         }
-        $entry = new Entry($word, $document);
-        $this->words[$word->getCanonical()][] = $entry;
-        $document->addWord($word);
+        ++$this->length;
+        $this->words[$canonical]->attach($document, $entry);
     }
 
-    public function getEntry(Word $word): ?Entry
+    public function has(string $canonical): bool
     {
-        return array_key_exists($word->getCanonical(), $this->words)
-            ? $this->words[$word->getCanonical()]
-            : null;
+        return array_key_exists($canonical, $this->words);
     }
 
-    public function dumpWords()
+    public function get(string $canonical): SplObjectStorage
     {
-        return array_keys($this->words);
+        return $this->words[$canonical];
+    }
+
+    /**
+     * @return SplObjectStorage[]
+     */
+    public function all(): array
+    {
+        return $this->words;
+    }
+
+    public function size(): int
+    {
+        return $this->size;
+    }
+
+    public function length(): int
+    {
+        return $this->length;
     }
 }

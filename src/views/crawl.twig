@@ -1,0 +1,8 @@
+{% extends "layout.twig" %}
+
+{% block content %}
+    <form action="{{ path('crawl') }}" method="get">
+        <input type="text" name="url" required placeholder="http://wikipedia.com">
+        <button>Index</button>
+    </form>
+{% endblock %}

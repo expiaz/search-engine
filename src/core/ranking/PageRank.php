@@ -31,22 +31,6 @@ class PageRank
         }
     }
 
-    public function pr(Document $doc)
-    {
-        $sum = 0;
-        if ($this->depth > 0) {
-            --$this->depth;
-            foreach ($doc->referencedBy as $ref) {
-                $sum += $this->pr($doc) / (($L = count($ref->referenceTo)) > 0 ? $L : $this->N);
-            }
-        } else {
-            foreach ($doc->referencedBy as $ref) {
-                $sum += $ref->getPageRank();
-            }
-        }
-        return (1 - self::$dampingFactor) / $this->N + self::$dampingFactor * $sum;
-    }
-
     /**
      * @return Document[]
      */
@@ -56,28 +40,26 @@ class PageRank
             return $this->documents;
         }
 
-        $t = 0;
         $bpr = (1 - self::$dampingFactor) / $this->N;
         while (count($this->copy)) {
-            ++$t;
             foreach ($this->copy as $i => $document) {
                 $sum = 0;
                 foreach ($document->referencedBy as $ref) {
-                    $k = count($ref->referenceTo);
-                    $s = $k > 0 ? $k : $this->N;
-                    $sum += $ref->getPageRank() / $s;
+                    $sum += $ref->getPageRank() / (($L = count($ref->referenceTo)) ? $L : $this->N);
                 }
-                $a = self::$dampingFactor * $sum;
-                $b = $bpr + $a;
-                // convergence is assumed to be atteingned
-                if ($b - $document->getPageRank() < self::$e) {
+                $pr = $bpr + self::$dampingFactor * $sum;
+                // convergence is assumed to be atteigned
+                if ($pr - $document->getPageRank() < self::$e) {
                     array_splice($this->copy, $i, 1);
                 }
-                $document->setPageRank($b);
+                $document->setPageRank($pr);
             }
         }
 
-        echo $t . "\n";
+        usort($this->documents, function(Document $a, Document $b) {
+            return $a->getPageRank() < $b->getPageRank();
+        });
+
         return $this->documents;
     }
 

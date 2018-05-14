@@ -1,1 +1,22 @@
-"c'", "d'", "j'", "l'", "m'", "n'",
+{% extends "layout.twig" %}
+
+{% block content %}
+    <form action="{{ path('search') }}" method="get">
+        <input type="text" name="s" required value="{{ query }}">
+    </form>
+
+    {% if documents |length %}
+        <section>
+            <em>{{ documents |length }} documents found in {{ time }} seconds</em>
+            <ul>
+                {% for document in documents %}
+                    <li>
+                        <a href="{{ document.url.url }}">{{ document.title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% else %}
+        <h1>No results found</h1>
+    {% endif %}
+{% endblock %}

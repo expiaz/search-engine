@@ -2,11 +2,13 @@
 
 namespace SearchEngine\Core;
 
+use DOMDocument;
 use DOMElement;
 use Masterminds\HTML5;
 use SearchEngine\Core\Document\Document;
 use SearchEngine\Core\Document\Url;
 use SearchEngine\Core\Document\Word;
+use SearchEngine\Core\Index\Entry;
 use SearchEngine\Core\Index\InvertedIndex;
 use SplQueue;
 
@@ -16,183 +18,212 @@ class Crawler
     private $index;
     private $lemmatiser;
     private $documents;
+    private $parser;
 
-    private $maxDepth;
+    private $maxDocuments;
     private $maxTags;
-    private $maxRedoundance;
-    private $sites;
 
     /**
      * Crawler constructor.
-     * @param int $maxDepth
-     * @param int $maxUniqueTagIndexed
+     * @param int|Document[] $documents
+     * @param int $tags
      * @param null|InvertedIndex $from
-     * @param Document[] $documents
      */
-    public function __construct(int $maxDepth = 100, int $maxUniqueTagIndexed = 5, int $maxLinksRedoundance = 5, ?InvertedIndex $from = null, array $documents = []){
-        $this->maxDepth = $maxDepth;
-        $this->maxTags = $maxUniqueTagIndexed;
+    public function __construct(int $documents = 100, int $tags = 5, ?InvertedIndex $from = null){
+
         $this->queue = new SplQueue();
+        $this->parser = new HTML5();
         $this->index = $from ?? new InvertedIndex();
         $this->lemmatiser = new Lexer();
         $this->documents = [];
-        $this->sites = [];
-        $this->maxRedoundance = $maxLinksRedoundance;
-        foreach ($documents as $document) {
-            $this->documents[$document->getUrl()->getUri()] = $document;
+
+        $this->maxDocuments = $documents ?? 1;
+        $this->maxTags = $tags ?? 1;
+    }
+
+
+    /**
+     * @param DOMDocument $dom
+     * @param $tagName
+     * @return DOMElement[]
+     */
+    private function getTags(DOMDocument $dom, string $tagName): array
+    {
+        $list = $dom->getElementsByTagName($tagName);
+        $collection = iterator_to_array($list);
+        if ($list->length > $this->maxTags) {
+            return array_slice($collection, 0, $this->maxTags);
         }
+        return $collection;
+    }
+
+    /**
+     * @param DOMDocument $dom
+     * @param $tagName
+     * @return DOMElement|null
+     */
+    private function getTag(DOMDocument $dom, string $tagName): ?DOMElement
+    {
+        $list = $dom->getElementsByTagName($tagName);
+        return $list->length ? $list->item(0) : null;
     }
 
     public function crawl(string $url): InvertedIndex
     {
         $ressource = new Url($url);
-        if ($ressource->shouldFollow($this->maxRedoundance)) {
-            $this->queue->enqueue(new Document($ressource));
+        if ($ressource->shouldFollow()) {
+            $doc = new Document($ressource);
+            $this->documents[$doc->getUrl()->getUri()] = $doc;
+            $this->queue->enqueue($doc);
         }
-        while ($this->maxDepth && $this->queue->count() > 0) {
-            --$this->maxDepth;
-            echo $this->maxDepth . " : ";
-            $a = $this->queue->dequeue();
-            echo $a->getUrl() . "\n";
-            $this->parse($a);
+
+        while ($this->maxDocuments-- && $this->queue->count()) {
+            $this->parse($this->queue->dequeue());
+        }
+
+        // TF-IDF calculation
+        $N = $this->index->length();
+        foreach ($this->index->all() as $canonical => $entries) {
+            // document frequency
+            $df = $entries->count();
+            // inverse document frequency
+            $idf = log($N / $df);
+            foreach ($entries as $document) {
+                /**
+                 * @var $document Document
+                 * @var $entry Entry
+                 */
+                $entry = $entries[$document];
+                // term frequency
+                $tf = $entry->occurences;
+                // tf-idf
+                $tfidf = $tf * $idf;
+                // TODO merge semantic weight with tfidf
+                $entry->weight = $tfidf;
+            }
+        }
+
+        // compute euclidian length of each document
+        foreach ($this->documents as $document) {
+            $len = 0;
+            foreach ($document->getWords() as $word) {
+                $len += $word->weight * $word->weight;
+            }
+            $document->eucludianLength = sqrt($len);
         }
 
         return $this->index;
     }
+
+
 
     /**
      * @param Document $document
      */
     private function parse(Document $document)
     {
+        echo "parse {$this->maxDocuments} : {$document->getUrl()->getUrl()}\n";
+
+        echo "\tLOAD ... ";
+
         $html = $document->getUrl()->getRessource();
-        if (null === $document) {
+        if (null === $html) {
             return;
         }
 
-        $dom = (new HTML5())->loadHTML($html);
+        echo "OK\n";
 
-        $titles = $dom->getElementsByTagName('title');
-        if ($titles->length > 0) {
-            $title = $titles->item(0);
-            $this->registerWords(
-                $document,
-                $title->textContent,
-                Word::TITLE
-            );
-        }
+        echo "\tPARSE ... ";
 
-        foreach ([
-            'h1' => Word::H1,
-            'h2' => Word::H2,
-            'h3' => Word::H3
-        ] as $tag => $type) {
-            $collection = $dom->getElementsByTagName($tag);
-            $max = $collection->length > $this->maxTags ? $this->maxTags : $collection->length;
-            for ($i = 0; $i < $max; $i++) {
-                $this->registerWords(
-                    $document,
-                    $collection->item($i)->textContent,
-                    $type
-                );
+        $dom = $this->parser->loadHTML($html);
+        $name = null;
+
+        $title = $this->getTag($dom, 'title');
+        if ($title !== null) {
+            $value = trim($title->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Word::TITLE);
+                $name = $value;
             }
         }
 
-        /*foreach ($dom->getElementsByTagName('h1') as $h1) {
-            $this->registerWords(
-                $document,
-                $h1->textContent,
-                Word::H1
-            );
+        foreach ($this->getTags($dom, 'h1') as $h1) {
+            $value = trim($h1->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Word::H1);
+                if ($name === null) {
+                    $name = $value;
+                }
+            }
         }
-        foreach ($dom->getElementsByTagName('h2') as $h2) {
-            $this->registerWords($document,
-                $h2->textContent,
-                Word::H2
-            );
+
+        if ($name !== null) {
+            $document->setTitle($name);
         }
-        foreach ($dom->getElementsByTagName('h3') as $h3) {
-            $this->registerWords(
-                $document,
-                $h3->textContent,
-                Word::H3
-            );
-        }
-        foreach ($dom->getElementsByTagName('h4') as $h4) {
-            $this->registerWords(
-                $document,
-                $h4->textContent,
-                Word::H4
-            );
-        }*/
 
         $links = $dom->getElementsByTagName('a');
+
+        echo "OK\n";
+
         $followed = 0;
         for ($i = 0; $followed < $this->maxTags && $i < $links->length; ++$i) {
             $a = $links->item($i);
-            $href = $a->getAttribute('href');
-            $value = $a->textContent;
+            $href = trim($a->getAttribute('href'));
+            $value = trim($a->textContent);
             if (strlen($href) && strlen($value)) {
                 $url = new Url($href, $document->getUrl());
 
-                // banlist for header / footer / menus links in the same site
-                if (! array_key_exists($url->getHost(), $this->sites)) {
-                    $this->sites[$url->getHost()] = [];
-                }
-
                 // follow the url, non duplicate in the document or reference the actual document
                 // and can be accessed with 200 status code and html content type
-                if ($url->shouldFollow(
-                    $this->maxRedoundance,
-                    $this->sites[$url->getHost()],
-                    $document->referenceTo
-                )) {
+                if ($url->shouldFollow($this->documents, $document->referenceTo)) {
                     ++$followed;
-                    echo $href . "\n";
-
-                    // add it to the traversed links for this domain
-                    $this->sites[$url->getHost()][] = $url;
 
                     // if not already indexed, add it
                     if (! array_key_exists($url->getUri(), $this->documents)) {
                         $doc = new Document($url);
                         // add it to the crawl list
-                        $this->queue->enqueue($doc);
                         $this->documents[$url->getUri()] = $doc;
+                        $this->queue->enqueue($doc);
                     } else {
                         $doc = $this->documents[$url->getUri()];
                     }
+
                     // register the keywords for the link
-                    /*$this->registerWords(
+                    $this->registerWords(
                         $document,
                         $value,
                         Word::LINK
-                    );*/
+                    );
                     // reference it from the actual document
                     $document->reference($doc);
                 }
             }
         }
 
-        // search words in the full document
-        /*
-        foreach ($document->getWords() as $word) {
-            $pos = 0;
-            while (false !== $pos = strpos(
-                $dom->textContent,
-                $word->getValue(),
-                $pos
-            )) {
-                $word->occurence();
+        foreach ($this->lemmatiser->lemmatise(
+            trim($dom->textContent),
+            Word::BODY
+        ) as $canonical => $entry) {
+            if ($document->haveWord($canonical)) {
+                // remove the ones found before as titles and links
+                $base = $document->getWord($canonical)->occurences;
+                // $entry->occurence(- $document->getWord($canonical)->occurences);
+                $entry->occurences -= $base;
+                $entry->weight -= $base * Word::BODY;
+                $document->getWord($canonical)->merge($entry);
             }
         }
-        */
     }
 
     private function registerWords(Document $document, $sentence, $type)
     {
-        foreach ($this->lemmatiser->lemmatise($sentence, $type) as $word) {
-           $this->index->addEntry($word, $document);
+        foreach ($this->lemmatiser->lemmatise($sentence, $type) as $canonnical => $entry) {
+            if ($document->haveWord($canonnical)) {
+                $document->getWord($canonnical)->merge($entry);
+            } else {
+                $this->index->add($document, $canonnical, $entry);
+                $document->addWord($canonnical, $entry);
+            }
         }
     }
 

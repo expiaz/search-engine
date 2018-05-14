@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+</html>
+<body>
+    <nav>
+        <ul>
+            <li>
+                <a href="{{ path('index') }}">Recherche</a>
+            </li>
+            <li>
+                <a href="{{ path('crawl') }}">Indéxer</a>
+            </li>
+            <li>
+                <a href="{{ path('stats') }}">Informations</a>
+            </li>
+        </ul>
+    </nav>
+
+    {% block content %}{% endblock %}
+</body>

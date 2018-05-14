@@ -40,19 +40,23 @@ class Url
         $this->context = $context;
         $this->url = "{$this->scheme}://{$this->host}";
         $this->uri = "{$this->scheme}://{$this->host}";
+        if ($this->port && (int) $this->port !== 80) {
+            $this->url .= ":{$this->port}";
+            $this->uri .= ":{$this->port}";
+        }
         if ($this->path) {
+            if ($this->path[0] === '/') {
+                $this->path = substr($this->path, 1);
+            }
             $this->url .= "/{$this->path}";
             $this->uri .= "/{$this->path}";
         }
         if ($this->query) {
             $this->url .= "?{$this->query}";
-            $this->uri .= "/{$this->query}";
+            $this->uri .= "?{$this->query}";
         }
         if ($this->fragment) {
             $this->url .= "#{$this->fragment}";
-        }
-        if ($this->port && (int) $this->port !== 80) {
-            $this->url .= ":{$this->port}";
         }
     }
 
@@ -125,12 +129,11 @@ class Url
     }
 
     /**
-     * @param int $maxRedundance
-     * @param array $siteLinks
+     * @param Document[] $traversed
      * @param Document[] $pageLinks
      * @return bool does the crawler should explore this ressource
      */
-    public function shouldFollow(int $maxRedundance, array $siteLinks = [], array $pageLinks = []): bool
+    public function shouldFollow(?array $traversed = [], ?array $pageLinks = []): bool
     {
         // a page is identified by it's domain, path and query
         // the fragment does not identify a different page
@@ -162,20 +165,17 @@ class Url
             return false;
         }
 
-        $redundance = 0;
-        foreach ($siteLinks as $traversed) {
-            if ($this->equals($traversed)) {
-                if (++$redundance >= $maxRedundance) {
-                    return false;
-                }
-            }
-        }
-
         foreach ($pageLinks as $traversed) {
             // the url is redundant in the document
             if ($this->equals($traversed->getUrl())) {
                 return false;
             }
+        }
+
+        if (array_key_exists($this->getUri(), $traversed)) {
+            // already accessed before
+            echo "\tfollow {$this->getUrl()} [CACHE]\n";
+            return true;
         }
 
         // try to fetch the page
@@ -207,6 +207,7 @@ class Url
             return false;
         }
 
+        echo "\tfollow {$this->getUrl()} [FETCH]\n";
         return false !== $content;
     }
 

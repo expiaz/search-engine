@@ -4,7 +4,8 @@
         "masterminds/html5": "^2.3",
         "twig/twig": "^2.4",
         "silex/silex": "~2.0",
-        "wamania/php-stemmer": "^1.2"
+        "wamania/php-stemmer": "^1.2",
+        "symfony/twig-bridge": "^4.0"
     },
     "autoload": {
         "psr-4": {
