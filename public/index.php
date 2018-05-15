@@ -1,10 +1,6 @@
 <?php
 
-define('ROOT', dirname(__DIR__));
-require_once ROOT . '/vendor/autoload.php';
-
-define('CACHED_INDEX', ROOT . '/data/index.data');
-define('CACHED_DOCS', ROOT . '/data/documents.data');
+require_once __DIR__ . '/../src/constants.php';
 
 $app = new Silex\Application();
 
@@ -25,5 +21,8 @@ $app->get('/crawl', SearchEngine\Controller\IndexController::class . '::crawlAct
 
 $app->get('/stats', SearchEngine\Controller\IndexController::class . '::statsAction')
     ->bind('stats');
+
+$app->get('/details', \SearchEngine\Controller\IndexController::class . '::detailsAction')
+    ->bind('details');
 
 $app->run();

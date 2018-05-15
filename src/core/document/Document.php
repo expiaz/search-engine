@@ -3,8 +3,9 @@
 namespace SearchEngine\Core\Document;
 
 use SearchEngine\Core\Index\Entry;
+use SearchEngine\Core\Misc\Hashable;
 
-class Document
+class Document implements Hashable
 {
     /**
      * @var Url
@@ -41,6 +42,7 @@ class Document
         $this->referenceTo = [];
         $this->referencedBy = [];
         $this->pageRank = 0;
+
         $this->title = $url->getUri();
 
         $this->eucludianLength = 0;
@@ -117,6 +119,11 @@ class Document
     public function __toString()
     {
         return "URI:{$this->url->getUri()} PR:{$this->pageRank} SIM:{$this->revelance}";
+    }
+
+    public function hash(): string
+    {
+        return $this->url->hash();
     }
 
 }

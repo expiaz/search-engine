@@ -5,13 +5,35 @@
         <input type="text" name="s" required value="{{ query }}">
     </form>
 
-    {% if documents |length %}
+    {% if hits |length %}
         <section>
-            <em>{{ documents |length }} documents found in {{ time }} seconds</em>
+            <em>{{ hits |length }} documents found in {{ time }} seconds</em>
             <ul>
-                {% for document in documents %}
+                {% for hit in hits %}
                     <li>
-                        <a href="{{ document.url.url }}">{{ document.title }}</a>
+                        <a href="{{ hit.document.url.url }}">{{ hit.document.title }}</a>
+                        {% for matchedEntry in hit.matchs %}
+                            <div>
+                                <em>
+                                    <strong>{{ matchedEntry.words |join(', ') }}</strong> :
+                                    {{ hit.matchs[matchedEntry].words |join(', ') }}
+                                </em>
+                            </div>
+                        {% endfor %}
+                        {% if hit.suggestions.count() %}
+                            <p>Suggestions</p>
+                            {% for suggestedEntry in hit.suggestions %}
+                                <div>
+                                    <em>
+                                        <strong>{{ suggestedEntry.words |join(', ') }}</strong> :
+                                        {% for docEntry in hit.suggestions[suggestedEntry].words %}
+                                            {{ hit.suggestions[suggestedEntry][docEntry].words |join(', ') }}
+                                        {% endfor %}
+                                    </em>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        <br/>
                     </li>
                 {% endfor %}
             </ul>

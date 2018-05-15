@@ -2,7 +2,10 @@
 
 namespace SearchEngine\Core\Document;
 
-class Url
+use SearchEngine\Core\Misc\Hashable;
+use SearchEngine\Core\Misc\Logger;
+
+class Url implements Hashable
 {
     private $raw;
     private $url;
@@ -24,7 +27,7 @@ class Url
      */
     public function __construct(string $url, ?Url $context = null)
     {
-        $parts = parse_url($url);
+        $parts = parse_url(trim($url));
         if (null !== $context) {
             $parts += $context->getParts();
         }
@@ -174,7 +177,7 @@ class Url
 
         if (array_key_exists($this->getUri(), $traversed)) {
             // already accessed before
-            echo "\tfollow {$this->getUrl()} [CACHE]\n";
+            Logger::logln("follow {$this->getUrl()} [CACHE]");
             return true;
         }
 
@@ -207,7 +210,7 @@ class Url
             return false;
         }
 
-        echo "\tfollow {$this->getUrl()} [FETCH]\n";
+        Logger::logln("follow {$this->getUrl()} [FETCH]");
         return false !== $content;
     }
 
@@ -250,4 +253,8 @@ class Url
         return $this->url;
     }
 
+    public function hash(): string
+    {
+        return $this->uri;
+    }
 }

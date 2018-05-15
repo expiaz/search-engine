@@ -10,6 +10,7 @@ use SearchEngine\Core\Document\Url;
 use SearchEngine\Core\Document\Word;
 use SearchEngine\Core\Index\Entry;
 use SearchEngine\Core\Index\InvertedIndex;
+use SearchEngine\Core\Misc\Logger;
 use SplQueue;
 
 class Crawler
@@ -37,8 +38,8 @@ class Crawler
         $this->lemmatiser = new Lexer();
         $this->documents = [];
 
-        $this->maxDocuments = $documents ?? 1;
-        $this->maxTags = $tags ?? 1;
+        $this->maxDocuments = $documents ?: 1;
+        $this->maxTags = $tags ?: 1;
     }
 
 
@@ -82,6 +83,7 @@ class Crawler
         }
 
         // TF-IDF calculation
+        $this->index->setLength(count($this->documents));
         $N = $this->index->length();
         foreach ($this->index->all() as $canonical => $entries) {
             // document frequency
@@ -122,18 +124,17 @@ class Crawler
      */
     private function parse(Document $document)
     {
-        echo "parse {$this->maxDocuments} : {$document->getUrl()->getUrl()}\n";
+        Logger::logln("parse {$this->maxDocuments} : {$document->getUrl()->getUrl()}");
 
-        echo "\tLOAD ... ";
+        Logger::log("LOAD ... ");
 
         $html = $document->getUrl()->getRessource();
         if (null === $html) {
             return;
         }
 
-        echo "OK\n";
-
-        echo "\tPARSE ... ";
+        Logger::logln("OK");
+        Logger::log("PARSE ... ");
 
         $dom = $this->parser->loadHTML($html);
         $name = null;
@@ -161,9 +162,30 @@ class Crawler
             $document->setTitle($name);
         }
 
+        foreach ($this->getTags($dom, 'h2') as $h2) {
+            $value = trim($h2->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Word::H2);
+            }
+        }
+
+        foreach ($this->getTags($dom, 'h3') as $h3) {
+            $value = trim($h3->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Word::H3);
+            }
+        }
+
+        foreach ($this->getTags($dom, 'h4') as $h4) {
+            $value = trim($h4->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Word::H4);
+            }
+        }
+
         $links = $dom->getElementsByTagName('a');
 
-        echo "OK\n";
+        Logger::logln("OK");
 
         $followed = 0;
         for ($i = 0; $followed < $this->maxTags && $i < $links->length; ++$i) {
@@ -211,7 +233,10 @@ class Crawler
                 $entry->occurences -= $base;
                 $entry->weight -= $base * Word::BODY;
                 $document->getWord($canonical)->merge($entry);
-            }
+            }/* else {
+                $this->index->add($document, $canonical, $entry);
+                $document->addWord($canonical, $entry);
+            }*/
         }
     }
 

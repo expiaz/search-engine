@@ -3,13 +3,14 @@
 namespace SearchEngine\Controller;
 
 use SearchEngine\Core\Crawler;
-use SearchEngine\Core\Document\Query;
+use SearchEngine\Core\Document\Document;
+use SearchEngine\Core\Misc\Logger;
+use SearchEngine\Core\Search\Query;
 use SearchEngine\Core\Index\InvertedIndex;
 use SearchEngine\Core\Ranking\PageRank;
 use SearchEngine\Core\VectorialModel;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGenerator;
 use Twig_Environment;
 
@@ -60,11 +61,13 @@ class IndexController
          * @var InvertedIndex $index
          */
         $index = unserialize(file_get_contents(CACHED_INDEX));
-        $results = VectorialModel::cosim($index, new Query($query));
+        $q = new Query($query);
+        $q->complete($index);
+        $results = VectorialModel::cosim($index, $q);
 
         // display results
         return $twig->render('results.twig', [
-            'documents' => $results,
+            'hits' => $results,
             'query' => $query,
             'time' => number_format(microtime(true) - $time, 2)
         ]);
@@ -72,6 +75,8 @@ class IndexController
 
     public function crawlAction(Request $request, Application $app)
     {
+        set_time_limit(0);
+
         /**
          * @var UrlGenerator $router
          */
@@ -86,7 +91,9 @@ class IndexController
             return $twig->render('crawl.twig');
         }
 
-        $crawler = new Crawler(5, 5);
+        $maxDocs = (int) $request->query->get('max_docs') ?: 5;
+        $maxTags = (int) $request->query->get('max_tags') ?: 5;
+        $crawler = new Crawler($maxDocs, $maxTags);
 
         $index = $crawler->crawl($url);
         $documents = $crawler->getDocuments();
@@ -96,6 +103,10 @@ class IndexController
 
         file_put_contents(CACHED_INDEX, serialize($index));
         file_put_contents(CACHED_DOCS, serialize($documents));
+
+        Logger::logln("END CRAWLING");
+        Logger::logln("{$index->length()} documents, {$index->size()} mots");
+        return '';
 
         return $app->redirect($router->generate('stats'));
     }
@@ -119,6 +130,41 @@ class IndexController
         $documents = unserialize(file_get_contents(CACHED_DOCS));
         return $twig->render('stats.twig', [
             'documents' => $documents
+        ]);
+    }
+
+    public function detailsAction(Request $request, Application $app)
+    {
+        /**
+         * @var UrlGenerator $router
+         */
+        $router = $app['url_generator'];
+        /**
+         * @var Twig_Environment $twig
+         */
+        $twig = $app['twig'];
+
+        if (! file_exists(CACHED_DOCS)) {
+            // redirect crawl
+            return $app->redirect($router->generate('stats'));
+        }
+
+        $uri = $request->query->get('uri', '');
+        if (!strlen($uri)) {
+            return $app->redirect($router->generate('stats'));
+        }
+
+        /**
+         * @var $documents Document[]
+         */
+        $documents = unserialize(file_get_contents(CACHED_DOCS));
+
+        if (! array_key_exists($uri, $documents)) {
+            return $app->redirect($router->generate('stats'));
+        }
+
+        return $twig->render('details.twig', [
+            'document' => $documents[$uri]
         ]);
     }
 

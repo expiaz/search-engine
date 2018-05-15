@@ -1,10 +1,16 @@
 {% extends "layout.twig" %}
 
 {% block content %}
+    <p>
+        {{ documents |length }} documents
+    </p>
+
     <ul>
         {% for document in documents %}
             <li>
-                {{ document.title }} : <a href="{{ document.url.url }}">{{ document.url.url }}</a> : {{ document.pageRank }}
+                {{ loop.index }}. <a href="{{ path('details', {uri: document.url.uri}) }}">{{ document.title }}</a>
+                <p>Page Rank : {{ document.pageRank }}</p>
+                <p>{{ document.referencedBy |length }} liens entrants, {{ document.referenceTo |length }} liens sortants</p>
             </li>
         {% endfor %}
     </ul>

@@ -3,6 +3,11 @@
 {% block content %}
     <form action="{{ path('crawl') }}" method="get">
         <input type="text" name="url" required placeholder="http://wikipedia.com">
+        <br/>
+        <input type="number" name="max_docs" placeholder="maximum documents parsed (default 5)">
+        <br/>
+        <input type="number" name="max_tags" placeholder="maximum unique tags parsed (default 5)">
+        <br/>
         <button>Index</button>
     </form>
 {% endblock %}

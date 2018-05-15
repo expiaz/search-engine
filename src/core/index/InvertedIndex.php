@@ -24,7 +24,6 @@ class InvertedIndex
             ++$this->size;
             $this->words[$canonical] = new SplObjectStorage();
         }
-        ++$this->length;
         $this->words[$canonical]->attach($document, $entry);
     }
 
@@ -49,6 +48,14 @@ class InvertedIndex
     public function size(): int
     {
         return $this->size;
+    }
+
+    /**
+     * @param int $length
+     */
+    public function setLength(int $length)
+    {
+        $this->length = $length;
     }
 
     public function length(): int

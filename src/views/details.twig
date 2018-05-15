@@ -1,0 +1,40 @@
+{% extends "layout.twig" %}
+
+{% block content %}
+    <h1>{{ document.title }}</h1>
+    <p>URL: <a href="{{ document.url.url }}">{{ document.url.url }}</a></p>
+
+    <p>Référencé par (liens entrants)</p>
+    <ul>
+        {% for document in document.referencedBy %}
+            <li>
+                <a href="{{ path('details', {uri: document.url.uri}) }}">{{ document.title }}</a>
+                (<a href="{{ document.url.url }}">Lien</a>)
+            </li>
+        {% endfor %}
+    </ul>
+
+    <p>Référence (liens sortants)</p>
+    <ul>
+        {% for document in document.referenceTo %}
+            <li>
+                <a href="{{ path('details', {uri: document.url.uri}) }}">{{ document.title }}</a>
+                (<a href="{{ document.url.url }}">Lien</a>)
+            </li>
+        {% endfor %}
+    </ul>
+
+    <p>Mots référencés, occurence et poids</p>
+    <ul>
+        {% for canon, entry in document.words %}
+            <li>
+                {{ canon }} - {{ entry.occurences }} occurences : {{ entry.weight }}
+                <ul>
+                    {% for word in entry.words %}
+                        <li>{{ word }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}
