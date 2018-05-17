@@ -3,8 +3,7 @@
 namespace SearchEngine\Core\Search;
 
 use SearchEngine\Core\Document\Document;
-use SearchEngine\Core\Index\Entry;
-use SearchEngine\Core\Misc\ArrayWrapper;
+use SearchEngine\Core\Index\InvertedIndexEntry;
 use SearchEngine\Core\Misc\Hashable;
 use SearchEngine\Core\Misc\Map;
 use SplObjectStorage;
@@ -27,8 +26,8 @@ class Hit implements Hashable
     public function __construct(Document $document)
     {
         $this->document = $document;
-        $this->matchs = new SplObjectStorage();
-        $this->suggestions = new SplObjectStorage();
+        $this->matchs = new Map();
+        $this->suggestions = new Map();
         $this->revelance = 0;
     }
 
@@ -66,18 +65,15 @@ class Hit implements Hashable
         $this->revelance /= $this->document->eucludianLength;
     }
 
-    public function match(Entry $queryTermEntry, Entry $documentTermEntry, float $dotProduct)
+    public function match(InvertedIndexEntry $queryTermEntry, InvertedIndexEntry $documentTermEntry)
     {
         $this->matchs->attach($queryTermEntry, $documentTermEntry);
-        $this->revelance += $dotProduct;
+        $this->revelance += $queryTermEntry->weight * $documentTermEntry->weight;
     }
 
-    public function suggest(Entry $suggestTermEntry, Entry $documentTermEntry, float $dotProduct)
+    public function suggest(InvertedIndexEntry $suggestTermEntry, InvertedIndexEntry $documentTermEntry, float $dotProduct)
     {
-        if (! $this->suggestions->contains($suggestTermEntry)) {
-            $this->suggestions->attach($suggestTermEntry, new ArrayWrapper());
-        }
-        $this->suggestions[$suggestTermEntry]->add($documentTermEntry);
+        $this->matchs->attach($suggestTermEntry, $documentTermEntry);
         $this->revelance += $dotProduct / 2;
     }
 

@@ -2,10 +2,13 @@
 
 namespace SearchEngine\Core\Search;
 
-use SearchEngine\Core\Index\Entry;
+use SearchEngine\Core\Crawl\Parser;
+use SearchEngine\Core\Index\InvertedIndexEntry;
 use SearchEngine\Core\Index\InvertedIndex;
+use SearchEngine\Core\Index\Thesaurus;
 use SearchEngine\Core\Lexer;
 use SearchEngine\Core\Misc\ArrayWrapper;
+use SearchEngine\Core\Misc\Map;
 use SplObjectStorage;
 
 class Query
@@ -13,44 +16,51 @@ class Query
 
     public $query;
     /**
-     * @var Entry[]
+     * @var InvertedIndexEntry[]
      */
     public $words;
     /**
      * @var SplObjectStorage
      */
     public $suggestions;
+    private $synonyms;
 
     /**
      * Search constructor.
      * @param string $query
-     * @param null|Lexer $lexer
+     * @param Parser $parser
      */
-    public function __construct(string $query, ?Lexer $lexer = null)
+    public function __construct(string $query, Parser $parser)
     {
         $this->query = $query;
-        $this->words = ($lexer ?? new Lexer())->lemmatise($query);
-        $this->suggestions = new SplObjectStorage();
+        $this->words = $parser->tokenize($query);
+        $this->suggestions = [];
+        $this->synonyms = [];
     }
 
-    public function complete(InvertedIndex $index)
+    /**
+     * @param InvertedIndex $index
+     * @param Thesaurus $thesaurus
+     */
+    public function complete(InvertedIndex $index, Thesaurus $thesaurus)
     {
-        foreach ($this->words as $querried => $entry) {
-            if (! $index->has($querried)) {
+        foreach ($this->words as $queryCanonical => $token) {
+            $this->suggestions[$queryCanonical] = [];
+            $this->synonyms[$queryCanonical] = [];
+
+            if (! $index->has($queryCanonical)) {
                 foreach ($index->all() as $canonical => $_) {
-                    // starts with or at least half of the word
+                    // starts with or at least 2/3 of the word
                     if (
-                        0 === strpos($canonical, $querried) ||
-                        levenshtein($querried, $canonical) <= strlen($canonical) / 3
+                        0 === strpos($canonical, $queryCanonical) ||
+                        levenshtein($queryCanonical, $canonical) <= strlen($canonical) / 3
                     ) {
-                        if (! $this->suggestions->contains($entry)) {
-                            $this->suggestions->attach($entry, new ArrayWrapper());
-                        }
-                        $this->suggestions[$entry]->add($canonical);
+                        $this->suggestions[$queryCanonical][] = $canonical;
                     }
                 }
             } else {
-                $this->suggestions->attach($entry, new ArrayWrapper());
+                // for the moment, extends to synonyms only for existing requested words
+                $this->synonyms[$queryCanonical] = $thesaurus->getSynonyms($queryCanonical);
             }
         }
     }

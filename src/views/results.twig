@@ -26,8 +26,8 @@
                                 <div>
                                     <em>
                                         <strong>{{ suggestedEntry.words |join(', ') }}</strong> :
-                                        {% for docEntry in hit.suggestions[suggestedEntry].words %}
-                                            {{ hit.suggestions[suggestedEntry][docEntry].words |join(', ') }}
+                                        {% for docEntry in hit.suggestions[suggestedEntry].toArray() %}
+                                            {{ docEntry.words |join(', ') }}
                                         {% endfor %}
                                     </em>
                                 </div>

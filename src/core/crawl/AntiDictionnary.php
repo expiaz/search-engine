@@ -1,6 +1,6 @@
 <?php
 
-namespace SearchEngine\Core;
+namespace SearchEngine\Core\Crawl;
 
 class AntiDictionnary
 {

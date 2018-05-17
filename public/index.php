@@ -25,4 +25,7 @@ $app->get('/stats', SearchEngine\Controller\IndexController::class . '::statsAct
 $app->get('/details', \SearchEngine\Controller\IndexController::class . '::detailsAction')
     ->bind('details');
 
+$app->get('/dico', \SearchEngine\Controller\IndexController::class . '::dicoAction')
+    ->bind('dico');
+
 $app->run();

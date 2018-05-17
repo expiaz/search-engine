@@ -1,15 +1,13 @@
 <?php
 
-namespace SearchEngine\Core;
+namespace SearchEngine\Core\Crawl;
 
 use DOMDocument;
 use DOMElement;
 use Masterminds\HTML5;
 use SearchEngine\Core\Document\Document;
 use SearchEngine\Core\Document\Url;
-use SearchEngine\Core\Document\Word;
-use SearchEngine\Core\Index\Entry;
-use SearchEngine\Core\Index\InvertedIndex;
+use SearchEngine\Core\Index\Thesaurus;
 use SearchEngine\Core\Misc\Logger;
 use SplQueue;
 
@@ -18,28 +16,27 @@ class Crawler
     private $queue;
     private $index;
     private $lemmatiser;
-    private $documents;
     private $parser;
+    private $thesaurus;
 
     private $maxDocuments;
     private $maxTags;
 
     /**
      * Crawler constructor.
-     * @param int|Document[] $documents
+     * @param int $documents
      * @param int $tags
-     * @param null|InvertedIndex $from
      */
-    public function __construct(int $documents = 100, int $tags = 5, ?InvertedIndex $from = null){
+    public function __construct(int $documents = 100, int $tags = -1){
 
         $this->queue = new SplQueue();
         $this->parser = new HTML5();
-        $this->index = $from ?? new InvertedIndex();
-        $this->lemmatiser = new Lexer();
-        $this->documents = [];
+        $this->index = new Index();
+        $this->lemmatiser = new Parser();
+        $this->thesaurus = new Thesaurus();
 
-        $this->maxDocuments = $documents ?: 1;
-        $this->maxTags = $tags ?: 1;
+        $this->maxDocuments = $documents > 0 ? $documents : 5;
+        $this->maxTags = $tags;
     }
 
 
@@ -69,12 +66,15 @@ class Crawler
         return $list->length ? $list->item(0) : null;
     }
 
-    public function crawl(string $url): InvertedIndex
+    /**
+     * @param string $url
+     * @return array [InvertedIndex, Map<Document>, Thesaurus]
+     */
+    public function crawl(string $url): array
     {
         $ressource = new Url($url);
-        if ($ressource->shouldFollow()) {
-            $doc = new Document($ressource);
-            $this->documents[$doc->getUrl()->getUri()] = $doc;
+        if ($ressource->shouldFollow($this->index->getDocuments())) {
+            $this->index->addDoc($doc = new Document($ressource));
             $this->queue->enqueue($doc);
         }
 
@@ -82,42 +82,11 @@ class Crawler
             $this->parse($this->queue->dequeue());
         }
 
-        // TF-IDF calculation
-        $this->index->setLength(count($this->documents));
-        $N = $this->index->length();
-        foreach ($this->index->all() as $canonical => $entries) {
-            // document frequency
-            $df = $entries->count();
-            // inverse document frequency
-            $idf = log($N / $df);
-            foreach ($entries as $document) {
-                /**
-                 * @var $document Document
-                 * @var $entry Entry
-                 */
-                $entry = $entries[$document];
-                // term frequency
-                $tf = $entry->occurences;
-                // tf-idf
-                $tfidf = $tf * $idf;
-                // TODO merge semantic weight with tfidf
-                $entry->weight = $tfidf;
-            }
-        }
+        $infos = $this->index->compute();
+        $infos[] = $this->thesaurus;
 
-        // compute euclidian length of each document
-        foreach ($this->documents as $document) {
-            $len = 0;
-            foreach ($document->getWords() as $word) {
-                $len += $word->weight * $word->weight;
-            }
-            $document->eucludianLength = sqrt($len);
-        }
-
-        return $this->index;
+        return $infos;
     }
-
-
 
     /**
      * @param Document $document
@@ -143,7 +112,7 @@ class Crawler
         if ($title !== null) {
             $value = trim($title->textContent);
             if (strlen($value)) {
-                $this->registerWords($document, $value, Word::TITLE);
+                $this->registerWords($document, $value, Token::TITLE);
                 $name = $value;
             }
         }
@@ -151,7 +120,7 @@ class Crawler
         foreach ($this->getTags($dom, 'h1') as $h1) {
             $value = trim($h1->textContent);
             if (strlen($value)) {
-                $this->registerWords($document, $value, Word::H1);
+                $this->registerWords($document, $value, Token::H1);
                 if ($name === null) {
                     $name = $value;
                 }
@@ -165,21 +134,28 @@ class Crawler
         foreach ($this->getTags($dom, 'h2') as $h2) {
             $value = trim($h2->textContent);
             if (strlen($value)) {
-                $this->registerWords($document, $value, Word::H2);
+                $this->registerWords($document, $value, Token::H2);
             }
         }
 
         foreach ($this->getTags($dom, 'h3') as $h3) {
             $value = trim($h3->textContent);
             if (strlen($value)) {
-                $this->registerWords($document, $value, Word::H3);
+                $this->registerWords($document, $value, Token::H3);
             }
         }
 
         foreach ($this->getTags($dom, 'h4') as $h4) {
             $value = trim($h4->textContent);
             if (strlen($value)) {
-                $this->registerWords($document, $value, Word::H4);
+                $this->registerWords($document, $value, Token::H4);
+            }
+        }
+
+        foreach ($this->getTags($dom, 'h5') as $h5) {
+            $value = trim($h5->textContent);
+            if (strlen($value)) {
+                $this->registerWords($document, $value, Token::H5);
             }
         }
 
@@ -188,33 +164,35 @@ class Crawler
         Logger::logln("OK");
 
         $followed = 0;
-        for ($i = 0; $followed < $this->maxTags && $i < $links->length; ++$i) {
+        $max = $this->maxTags > 0 ? $this->maxTags : $links->length;
+        for ($i = 0; $followed < $max && $i < $links->length; ++$i) {
             $a = $links->item($i);
             $href = trim($a->getAttribute('href'));
             $value = trim($a->textContent);
+
             if (strlen($href) && strlen($value)) {
                 $url = new Url($href, $document->getUrl());
 
                 // follow the url, non duplicate in the document or reference the actual document
                 // and can be accessed with 200 status code and html content type
-                if ($url->shouldFollow($this->documents, $document->referenceTo)) {
+                if ($url->shouldFollow($this->index->getDocuments(), $document->referenceTo)) {
                     ++$followed;
 
                     // if not already indexed, add it
-                    if (! array_key_exists($url->getUri(), $this->documents)) {
+                    if (! $this->index->haveDoc($url->getUri())) {
                         $doc = new Document($url);
+                        $this->index->addDoc($doc);
                         // add it to the crawl list
-                        $this->documents[$url->getUri()] = $doc;
                         $this->queue->enqueue($doc);
                     } else {
-                        $doc = $this->documents[$url->getUri()];
+                        $doc = $this->index->getDoc($url->getUri());
                     }
 
                     // register the keywords for the link
                     $this->registerWords(
                         $document,
                         $value,
-                        Word::LINK
+                        Token::LINK
                     );
                     // reference it from the actual document
                     $document->reference($doc);
@@ -222,51 +200,32 @@ class Crawler
             }
         }
 
-        foreach ($this->lemmatiser->lemmatise(
-            trim($dom->textContent),
-            Word::BODY
-        ) as $canonical => $entry) {
-            if ($document->haveWord($canonical)) {
-                // remove the ones found before as titles and links
-                $base = $document->getWord($canonical)->occurences;
-                // $entry->occurence(- $document->getWord($canonical)->occurences);
-                $entry->occurences -= $base;
-                $entry->weight -= $base * Word::BODY;
-                $document->getWord($canonical)->merge($entry);
-            }/* else {
-                $this->index->add($document, $canonical, $entry);
-                $document->addWord($canonical, $entry);
-            }*/
+        // body occurences
+        $qp = html5qp($dom, 'body *:not(script):not(h1):not(h2):not(h3):not(h4):not(h5):not(a)');
+        foreach ($qp->toArray() as $tag) {
+            foreach ($this->lemmatiser->tokenize($tag->textContent) as $canonical => $token) {
+                if (
+                    $this->index->haveRow($canonical) &&
+                    $this->index->getRow($canonical)->contains($document)
+                ) {
+                    $existingToken = $this->index->getRow($canonical)->offsetGet($document);
+                    $existingToken->merge($token);
+                }
+            }
+        }
+
+        // thesaurus
+        $qp = html5qp($dom, 'body *:not(script)');
+        foreach ($qp->toArray() as $tag) {
+            $this->thesaurus->add($this->lemmatiser->normalize($tag->textContent));
         }
     }
 
     private function registerWords(Document $document, $sentence, $type)
     {
-        foreach ($this->lemmatiser->lemmatise($sentence, $type) as $canonnical => $entry) {
-            if ($document->haveWord($canonnical)) {
-                $document->getWord($canonnical)->merge($entry);
-            } else {
-                $this->index->add($document, $canonnical, $entry);
-                $document->addWord($canonnical, $entry);
-            }
+        foreach ($this->lemmatiser->tokenize($sentence, $type) as $token) {
+            $this->index->add($document, $token);
         }
-    }
-
-    /**
-     * @return InvertedIndex
-     */
-    public function getIndex()
-    {
-        return $this->index;
-    }
-
-
-    /**
-     * @return Document[]
-     */
-    public function getDocuments()
-    {
-        return $this->documents;
     }
 
 }

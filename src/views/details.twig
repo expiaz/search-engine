@@ -28,7 +28,7 @@
     <ul>
         {% for canon, entry in document.words %}
             <li>
-                {{ canon }} - {{ entry.occurences }} occurences : {{ entry.weight }}
+                {{ canon }} - {{ entry.occurences }} occurences : {{ entry.weight }} / {{ entry.tfidf }}
                 <ul>
                     {% for word in entry.words %}
                         <li>{{ word }}</li>

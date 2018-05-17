@@ -16,12 +16,21 @@ class Map {
     }
 
     /**
+     * @param Hashable $key
      * @param $value mixed
-     * @param string $key
      */
-    public function add(Hashable $value, ?string $key = null)
+    public function add(Hashable $key, $value = null)
     {
-        $this->values[$key ?? $value->hash()] = $value;
+        $this->values[$key->hash()] = $value ?? $key;
+    }
+
+    /**
+     * @param string $key
+     * @param $value
+     */
+    public function addKey(string $key, $value = null)
+    {
+        $this->values[$key] = $value ?? $key;
     }
 
     public function get(Hashable $value, $default = null)
@@ -51,7 +60,14 @@ class Map {
 
     public function sort(callable $cb)
     {
-        usort($this->values, $cb);
+        uasort($this->values, $cb);
+    }
+
+    public function merge(Map $map)
+    {
+        foreach ($map->toArray() as $key => $value) {
+            $this->addKey($key, $value);
+        }
     }
 
 }

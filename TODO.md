@@ -16,3 +16,7 @@ TODO
 - levenshtein to suggest words
 - page rank
 - semantic
+
+- approche distributionnelle 
+- embeddings
+- build thesaurus

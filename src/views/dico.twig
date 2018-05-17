@@ -1,0 +1,17 @@
+{% extends "layout.twig" %}
+
+{% block content %}
+    <ul>
+        {% for word, row in dico %}
+            <li>
+                <strong>{{ word }} - {{ row.sum }}</strong><br/>
+                <strong>{{ row.synonyms() |join(', ') }}</strong><br/>
+                <ul>
+                    {% for w, n in row.all() %}
+                        <li>{{ w }} : {{ n }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

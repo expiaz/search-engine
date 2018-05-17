@@ -2,9 +2,10 @@
 
 require_once __DIR__ . '/src/constants.php';
 
-$tags = 5;
-$docs = 5;
-$url = 'https://scinfolex.com/2011/04/03/propulsion-curation-partage-et-le-droit-dans-tout-ca/';
+
+$tags = 1;
+$docs = 1;
+$url = 'https://github.com/';
 switch ($argc) {
     case 4:
         $tags = (int) $argv[3];
@@ -19,5 +20,5 @@ switch ($argc) {
         exit(0);*/
 }
 
-$crawler = new \SearchEngine\Core\Crawler($docs, $tags);
+$crawler = new \SearchEngine\Core\Crawl\Crawler($docs, $tags);
 $index = $crawler->crawl($url);

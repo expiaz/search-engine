@@ -4,6 +4,7 @@ namespace SearchEngine\Core\Document;
 
 use SearchEngine\Core\Misc\Hashable;
 use SearchEngine\Core\Misc\Logger;
+use SearchEngine\Core\Misc\Map;
 
 class Url implements Hashable
 {
@@ -37,16 +38,18 @@ class Url implements Hashable
         $this->path = $parts['path'] ?? null;
         $this->query = $parts['query'] ?? null;
         $this->fragment = $parts['fragment'] ?? null;
-        $this->port = $parts['port'] ?? null;
+        $this->port = (int) ($parts['port'] ?? 80);
 
         $this->raw = $url;
         $this->context = $context;
         $this->url = "{$this->scheme}://{$this->host}";
         $this->uri = "{$this->scheme}://{$this->host}";
-        if ($this->port && (int) $this->port !== 80) {
+
+        if ($this->port > 0 && $this->port !== 80) {
             $this->url .= ":{$this->port}";
             $this->uri .= ":{$this->port}";
         }
+
         if ($this->path) {
             if ($this->path[0] === '/') {
                 $this->path = substr($this->path, 1);
@@ -54,10 +57,12 @@ class Url implements Hashable
             $this->url .= "/{$this->path}";
             $this->uri .= "/{$this->path}";
         }
+
         if ($this->query) {
             $this->url .= "?{$this->query}";
-            $this->uri .= "?{$this->query}";
+            // $this->uri .= "?{$this->query}";
         }
+
         if ($this->fragment) {
             $this->url .= "#{$this->fragment}";
         }
@@ -124,25 +129,25 @@ class Url implements Hashable
     public function equals(Url $url)
     {
         return $this->host === $url->getHost() &&
-            $this->path === $url->getPath() &&
+            $this->path === $url->getPath() /*&&
             (
                 $this->query === $url->getQuery() ||
                 false !== strpos($url->getQuery(), $this->query)
-            );
+            )*/;
     }
 
     /**
-     * @param Document[] $traversed
+     * @param Map $traversed
      * @param Document[] $pageLinks
      * @return bool does the crawler should explore this ressource
      */
-    public function shouldFollow(?array $traversed = [], ?array $pageLinks = []): bool
+    public function shouldFollow(Map $traversed, array $pageLinks = []): bool
     {
         // a page is identified by it's domain, path and query
         // the fragment does not identify a different page
 
         // no scheme or host, can't identify the page
-        if (!$this->scheme || !$this->host) {
+        if (!$this->scheme || !$this->host || $this->port !== 80) {
             return false;
         }
 
@@ -168,14 +173,14 @@ class Url implements Hashable
             return false;
         }
 
-        foreach ($pageLinks as $traversed) {
+        foreach ($pageLinks as $seen) {
             // the url is redundant in the document
-            if ($this->equals($traversed->getUrl())) {
+            if ($this->equals($seen->getUrl())) {
                 return false;
             }
         }
 
-        if (array_key_exists($this->getUri(), $traversed)) {
+        if ($traversed->hasKey($this->getUri())) {
             // already accessed before
             Logger::logln("follow {$this->getUrl()} [CACHE]");
             return true;

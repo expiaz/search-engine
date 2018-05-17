@@ -2,8 +2,9 @@
 
 namespace SearchEngine\Core\Document;
 
-use SearchEngine\Core\Index\Entry;
+use SearchEngine\Core\Index\InvertedIndexEntry;
 use SearchEngine\Core\Misc\Hashable;
+use SearchEngine\Core\Misc\Map;
 
 class Document implements Hashable
 {
@@ -12,7 +13,7 @@ class Document implements Hashable
      */
     private $url;
     /**
-     * @var Word[]
+     * @var InvertedIndexEntry[]
      */
     private $words;
     /**
@@ -30,15 +31,11 @@ class Document implements Hashable
 
 
     public $eucludianLength;
-    /**
-     * @var int used at each query
-     */
-    public $revelance;
 
     public function __construct(Url $url)
     {
         $this->url = $url;
-        $this->words = [];
+        $this->words = new Map();
         $this->referenceTo = [];
         $this->referencedBy = [];
         $this->pageRank = 0;
@@ -46,8 +43,6 @@ class Document implements Hashable
         $this->title = $url->getUri();
 
         $this->eucludianLength = 0;
-
-        $this->revelance = 0;
     }
 
     public function getUrl(): Url
@@ -61,27 +56,27 @@ class Document implements Hashable
         $this->referenceTo[] = $document;
     }
 
-    public function addWord(string $canonical, Entry $entry)
+    public function addWord(InvertedIndexEntry $entry)
     {
-        $this->words[$canonical] = $entry;
+        $this->words->addKey($entry->canonical, $entry);
     }
 
     public function haveWord(string $canonical): bool
     {
-        return array_key_exists($canonical, $this->words);
+        return $this->words->hasKey($canonical);
     }
 
-    public function getWord(string $canonical): ?Entry
+    public function getWord(string $canonical, $default = null): ?InvertedIndexEntry
     {
-        return $this->words[$canonical];
+        return $this->words->getKey($canonical, $default);
     }
 
     /**
-     * @return Entry[]
+     * @return InvertedIndexEntry[]
      */
     public function getWords(): array
     {
-        return $this->words;
+        return $this->words->toArray();
     }
 
     /**
@@ -118,7 +113,7 @@ class Document implements Hashable
 
     public function __toString()
     {
-        return "URI:{$this->url->getUri()} PR:{$this->pageRank} SIM:{$this->revelance}";
+        return "URI:{$this->url->getUri()} PR:{$this->pageRank}";
     }
 
     public function hash(): string

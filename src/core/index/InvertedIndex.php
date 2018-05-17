@@ -3,6 +3,7 @@
 namespace SearchEngine\Core\Index;
 
 use SearchEngine\Core\Document\Document;
+use SearchEngine\Core\Misc\Map;
 use SplObjectStorage;
 
 class InvertedIndex
@@ -11,30 +12,21 @@ class InvertedIndex
     private $size;
     private $length;
 
-    public function __construct()
+    public function __construct(Map $words, int $size, int $length)
     {
-        $this->words = [];
-        $this->size = 0;
-        $this->length = 0;
+        $this->words = $words;
+        $this->size = $size;
+        $this->length = $length;
     }
 
-    public function add(Document $document, string $canonical, Entry $entry)
+    public function has(string $canonical)
     {
-        if (! $this->has($canonical)) {
-            ++$this->size;
-            $this->words[$canonical] = new SplObjectStorage();
-        }
-        $this->words[$canonical]->attach($document, $entry);
+        return $this->words->hasKey($canonical);
     }
 
-    public function has(string $canonical): bool
+    public function get(string $canonical, $default = null): SplObjectStorage
     {
-        return array_key_exists($canonical, $this->words);
-    }
-
-    public function get(string $canonical): SplObjectStorage
-    {
-        return $this->words[$canonical];
+        return $this->words->getKey($canonical, $default);
     }
 
     /**
@@ -42,20 +34,12 @@ class InvertedIndex
      */
     public function all(): array
     {
-        return $this->words;
+        return $this->words->toArray();
     }
 
     public function size(): int
     {
         return $this->size;
-    }
-
-    /**
-     * @param int $length
-     */
-    public function setLength(int $length)
-    {
-        $this->length = $length;
     }
 
     public function length(): int
